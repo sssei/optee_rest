@@ -21,6 +21,7 @@ use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session, trace_println,
 };
 use optee_utee::{Error, ErrorKind, Parameters, Result};
+use optee_utee::net::TcpStream;
 use proto::Command;
 
 use lazy_static::lazy_static;
@@ -62,9 +63,9 @@ fn destroy() {
 
 #[ta_invoke_command]
 fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
-/*     trace_println!("[+] TA invoke command"); */
+    trace_println!("[+] TA invoke command");
     let session_id = unsafe { params.0.as_value().unwrap().a() };
-/*     trace_println!("[+] session id: {}", session_id); */
+    trace_println!("[+] session id: {}", session_id);
     match Command::from(cmd_id) {
         Command::NewTlsSession => {
             trace_println!("[+] new_tls_session");
@@ -75,13 +76,13 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             let mut p1 = unsafe { params.1.as_memref().unwrap() };
             let mut p2 = unsafe { params.2.as_value().unwrap() };
             let buffer = p1.buffer();
-/*             trace_println!("[+] do_tls_read"); */
+            trace_println!("[+] do_tls_read");
             let flag = do_tls_read(session_id, buffer);
             p2.set_a(flag as u32);
             Ok(())
         }
         Command::DoTlsWrite => {
-/*             trace_println!("[+] do_tls_write"); */
+            trace_println!("[+] do_tls_write");
             let mut p1 = unsafe { params.1.as_memref().unwrap() };
             let mut p2 = unsafe { params.2.as_value().unwrap() };
             let mut buffer = p1.buffer();
@@ -94,8 +95,35 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
             close_tls_session(session_id);
             Ok(())
         }
+        Command::DeployServer => {
+            trace_println!("[+] socket_listen");
+            deploy_server(session_id);
+            Ok(())
+        }
         _ => Err(Error::new(ErrorKind::BadParameters)),
     }
+}
+
+pub fn deploy_server(session_id: u32) {
+    let mut stream = TcpStream::listen("0.0.0.0", 8089).unwrap();
+    trace_println!("[+] deploy_server");
+    stream.accept().unwrap();
+    let mut buf = [0u8; 1024];
+    loop {
+        match stream.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                trace_println!("[+] Received message");
+                let converted: String = String::from_utf8(buf[0..n].to_vec()).unwrap();
+                trace_println!("{:?}", converted);
+                stream.write(&buf[0..n]).unwrap();
+            }
+            Err(_) => {
+                trace_println!("Read Error");
+            }
+        }
+    }
+    
 }
 
 pub fn new_tls_session(session_id: u32) {

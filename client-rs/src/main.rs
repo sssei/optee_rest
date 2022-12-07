@@ -1,36 +1,26 @@
 use std::sync::Arc;
-
 use std::net::TcpStream;
-use std::io::{Read, Write, Cursor, BufReader, stdout};
+use std::io::{Read, Write, BufReader};
+use std::time::Instant;
+use std::fs::File;
 
 use rustls;
 use webpki_roots;
+use chrono::Utc;
 
-fn measure(tls: &mut rustls::Stream<rustls::ClientConnection, TcpStream>){
-    tls.write_all(
-        concat!(
-            "GET / HTTP/1.1\r\n",
-            "Host: google.com\r\n",
-            "Connection: close\r\n",
-            "Accept-Encoding: identity\r\n",
-            "Done\r\n"
-        )
-        .as_bytes(),
-    )
-    .unwrap();
-    tls.flush().unwrap();
-    let ciphersuite = tls
-        .conn
-        .negotiated_cipher_suite()
-        .unwrap();
-    writeln!(
-        &mut std::io::stderr(),
-        "Current ciphersuite: {:?}",
-        ciphersuite.suite()
-    )
-    .unwrap();
-    let mut plaintext = Vec::new();
-    tls.read_to_end(&mut plaintext).unwrap();    
+fn measure(tls: &mut rustls::Stream<rustls::ClientConnection, TcpStream>, size: usize, buf : &[u8], iter: u32){
+    let mut bytes = vec![0u8; size];
+    for _ in 0..iter { 
+        tls.write_all(&buf[0..size]).unwrap();
+        tls.flush().unwrap();
+        let mut n = 0;
+        loop {
+            n += tls.read(&mut bytes).unwrap();
+            if n >= size{
+                break;
+            }
+        }
+    }
 }
 
 fn main() {
@@ -62,7 +52,25 @@ fn main() {
     let mut conn = rustls::ClientConnection::new(Arc::new(config), server_name).unwrap();    
     let mut sock = TcpStream::connect("localhost:8089").unwrap();
     let mut tls = rustls::Stream::new(&mut conn, &mut sock);
-    
-    measure(&mut tls);
+ 
+    let file_name = Utc::now().format("%Y-%m-%d_%H-%M").to_string();
+    let mut file = File::create(file_name).unwrap();
+    let buf = vec![0u8; 1 << 27];
+    let iter = 100;
+    let mut time_buf = vec![0u128; 72];
+    for i in 1..72 { 
+        let sz = 256 * i;
+/*         write!(file, "size = {}\n", sz).unwrap(); */
+        let st = Instant::now();
+        measure(&mut tls, sz, &buf, iter);
+        let ed = Instant::now();
+        time_buf[i] = ed.duration_since(st).as_nanos();
+/*         write!(file, "{:?}\n", (ed - st) / iter).unwrap(); */
+    }
+    for i in 1..72 {
+        write!(file, "size = {}\n", 256 * i).unwrap();
+        write!(file, "{:?}ns\n", time_buf[i]).unwrap();
+    }
+    file.flush().unwrap();
 /*     stdout().write_all(&plaintext).unwrap();     */
 }
