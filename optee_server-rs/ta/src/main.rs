@@ -113,9 +113,9 @@ pub fn deploy_server(session_id: u32) {
         match stream.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
-                trace_println!("[+] Received message");
+/*                 trace_println!("[+] Received message"); */
                 let converted: String = String::from_utf8(buf[0..n].to_vec()).unwrap();
-                trace_println!("{:?}", converted);
+/*                 trace_println!("{:?}", converted); */
                 stream.write(&buf[0..n]).unwrap();
             }
             Err(_) => {
