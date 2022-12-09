@@ -1,0 +1,5 @@
+tools/*
+optee_server-rs/*/target
+*/target
+out
+!tools/measure_time.py
