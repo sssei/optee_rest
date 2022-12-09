@@ -21,11 +21,9 @@ lazy_static! {
 
 fn main() {
     let listener = TcpListener::bind("0.0.0.0:8089").unwrap();
-    let mut session_id: u32 = 0;
 
     for stream in listener.incoming() {
-        session_id += 1;
-        handle_client(session_id, stream.unwrap());
+        handle_client(stream.unwrap());
     }
 
     println!("Success");
@@ -33,82 +31,60 @@ fn main() {
 
 
 fn handle_client(
-    session_id: u32,    
     mut stream: TcpStream,
 ) {
     println!("new session");
-    new_tls_session(session_id);
+    let mut tls_session = new_tls_session();
     loop {
         let mut buf = [0u8; MAX_WIRE_SIZE];
-        let mut flag;
-        println!("stream read");
+        let mut plain_buf : Vec<u8> = Vec::new();
+/*         println!("stream read"); */
         match stream.read(&mut buf) {
             Ok(0) | Err(_) => {
                 println!("close session");
-                close_tls_session(session_id);
                 break;
             }
             Ok(n) => {
-                println!("read bytes: {}", n);
-                flag = do_tls_read(session_id, &mut buf[..n]);
+/*                 println!("read bytes: {}", n); */
+                do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
             }
         }
 
-        let n = do_tls_write(session_id, &mut buf);
-        println!("stream write n: {}", n);
+        let n = do_tls_write(&mut tls_session, &mut buf, &plain_buf);
+/*         println!("stream write n: {}", n); */
         let res = stream.write_all(&buf[..n]);
 
-        if res.is_err() || flag {
+        if res.is_err(){
             println!("close session");
-            close_tls_session(session_id);
             break;
         }
     }
 }
 
-fn do_tls_read(session_id: u32, buf: &[u8]) -> bool {
-    let mut rd = Cursor::new(buf);
-    let ts_guard = TLS_SESSIONS.read().unwrap();
-    let mut tls_session = ts_guard.get(&session_id).unwrap().lock().unwrap();
+fn do_tls_read(tls_session: &mut rustls::ServerSession, encrypted_buf: &[u8], plain_buf: &mut Vec<u8>){
+    let mut rd = Cursor::new(encrypted_buf);
     let _rc = tls_session.read_tls(&mut rd).unwrap();
     let _process =  tls_session.process_new_packets().unwrap();
-
-        // Read and process all available plaintext.
-    let mut buf = Vec::new();
-    let _rc = tls_session.read_to_end(&mut buf);
-    let plain_text: String = String::from_utf8(buf.clone()).unwrap();
-
-    if !buf.is_empty() {
-        tls_session.write_all(&buf).unwrap();
-    }
-
-    plain_text.contains("Done")
+    let _rc = tls_session.read_to_end(plain_buf);
 }
 
-fn do_tls_write(session_id: u32, buf: &mut [u8]) -> usize {
-    let ts_guard = TLS_SESSIONS.read().unwrap();
-    let mut tls_session = ts_guard.get(&session_id).unwrap().lock().unwrap();
-    let mut wr = Cursor::new(buf);
+fn do_tls_write(tls_session: &mut rustls::ServerSession, encrypted_buf: &mut [u8], plain_buf: &[u8]) -> usize {
+    if !plain_buf.is_empty() {
+        tls_session.write_all(&plain_buf).unwrap();
+    }
+    let mut wr = Cursor::new(encrypted_buf);
     let mut rc = 0;
     while tls_session.wants_write() {
         rc += tls_session.write_tls(&mut wr).unwrap();
     }
-
     rc
 }
 
-fn new_tls_session(session_id: u32) {
+fn new_tls_session() -> rustls::ServerSession{
     let tls_config = make_config();
-    let tls_session = rustls::ServerSession::new(&tls_config);
-    TLS_SESSIONS
-        .write()
-        .unwrap()
-        .insert(session_id, Mutex::new(tls_session));
+    rustls::ServerSession::new(&tls_config)
 }
 
-fn close_tls_session(session_id: u32) {
-    TLS_SESSIONS.write().unwrap().remove(&session_id);
-}
 
 fn make_config() -> Arc<rustls::ServerConfig> {
     let client_auth = NoClientAuth::new();
