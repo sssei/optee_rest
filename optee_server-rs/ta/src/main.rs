@@ -20,6 +20,7 @@
 use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session, trace_println,
 };
+use optee_utee::{DataFlag, ObjectStorageConstants, PersistentObject};
 use optee_utee::{Error, ErrorKind, Parameters, Result};
 use optee_utee::net::TcpStream;
 use proto::Command;
@@ -79,21 +80,121 @@ pub fn deploy_server() {
     let mut tls_session = new_tls_session();
     loop {
         let mut plain_buf : Vec<u8> = Vec::new();
+        let mut response : Vec<u8> = Vec::new();
         let mut buf = [0u8; MAX_WIRE_SIZE];
         match stream.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
                 do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
+                if !plain_buf.is_empty() {
+                    handle_request(&mut plain_buf, &mut response);
+                }
             }
             Err(_) => {
                 trace_println!("Read Error");
                 break;
             }
         }
-        let n = do_tls_write(&mut tls_session, &mut buf, &plain_buf);
+        let n = do_tls_write(&mut tls_session, &mut buf, &response);
         stream.write(&buf[..n]).unwrap();
     }
     
+}
+
+fn handle_request(plain_buf : &mut Vec<u8>, response : &mut Vec<u8>) {
+    let res = plain_buf.iter().map(|&s| s as char).collect::<String>();
+    let request : Vec<&str> = res.split("\r\n").collect();
+    trace_println!("{:?}", request);
+    let mut res_header : Vec<u8> = b"HTTP 200 OK\r\n".to_vec();
+    match request[0] {
+        "POST /config " => {
+            if request.len() != 3 {
+                trace_println!("Bad request");
+                panic!();
+            }
+            handle_post(request[1]);
+            response.append(&mut res_header);
+        }
+        "GET /config " => {
+            if request.len() != 2 {
+                trace_println!("Bad request");
+                panic!();
+            }
+            handle_get(response);
+        }
+        _ => {
+            trace_println!("Bad request");
+            panic!();
+        }
+    }
+} 
+
+fn handle_post(body: &str){
+    let bytes : &[u8] = body.as_bytes();
+    create_raw_object(bytes.to_vec()).unwrap();
+}
+
+fn handle_get(data: &mut Vec<u8>){
+    read_raw_object(data).unwrap();
+}
+
+fn create_raw_object(data: Vec<u8>) -> Result<()> {
+    let mut obj_id = vec![0, 1, 2, 3, 4];
+
+    let obj_data_flag = DataFlag::ACCESS_READ
+        | DataFlag::ACCESS_WRITE
+        | DataFlag::ACCESS_WRITE_META
+        | DataFlag::OVERWRITE;
+
+    let mut init_data: [u8; 0] = [0; 0];
+
+    match PersistentObject::create(
+        ObjectStorageConstants::Private,
+        &mut obj_id,
+        obj_data_flag,
+        None,
+        &mut init_data,
+    ) {
+        Err(e) => {
+            return Err(e);
+        }
+
+        Ok(mut object) => match object.write(&data) {
+            Ok(()) => {
+                return Ok(());
+            }
+            Err(e_write) => {
+                object.close_and_delete()?;
+                std::mem::forget(object);
+                return Err(e_write);
+            }
+        },
+    }
+}
+
+fn read_raw_object(data: &mut Vec<u8>) -> Result<()> {
+    let mut obj_id = vec![0, 1, 2, 3, 4];
+
+    match PersistentObject::open(
+        ObjectStorageConstants::Private,
+        &mut obj_id,
+        DataFlag::ACCESS_READ | DataFlag::SHARE_READ,
+    ) {
+        Err(e) => return Err(e),
+
+        Ok(object) => {
+            let obj_info = object.info()?;
+            let obj_size = obj_info.data_size(); 
+            data.resize(obj_size, 0);
+            let read_bytes = object.read(data).unwrap();
+
+            if read_bytes != obj_info.data_size() as u32 {
+                return Err(Error::new(ErrorKind::ExcessData));
+            }
+
+            Ok(())
+        }
+    }
 }
 
 pub fn new_tls_session() -> rustls::ServerSession {

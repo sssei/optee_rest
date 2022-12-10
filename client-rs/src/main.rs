@@ -10,12 +10,15 @@ use chrono::Utc;
 
 fn measure(tls: &mut rustls::Stream<rustls::ClientConnection, TcpStream>, size: usize, buf : &[u8], iter: u32){
     let mut bytes = vec![0u8; size];
-    for _ in 0..iter { 
+    for _ in 0..iter {
+        println!("write {:?} bytes", size);
         tls.write_all(&buf[0..size]).unwrap();
         tls.flush().unwrap();
         let mut n = 0;
         loop {
-            n += tls.read(&mut bytes).unwrap();
+            let tmp = tls.read(&mut bytes).unwrap();
+            println!("recieved {:?} bytes", tmp);
+            n += tmp;
             if n >= size{
                 break;
             }
