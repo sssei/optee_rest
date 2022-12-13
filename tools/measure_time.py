@@ -53,6 +53,7 @@ plt.xlabel("byte size")
 plt.ylabel("RTT(ms)")
 #plt.yscale("log")
 plt.legend()
+plt.ylim(bottom=0)
 plt.grid()
 fig.savefig(file_name + ".png")
 
