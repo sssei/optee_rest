@@ -39,7 +39,7 @@ static void log_file(long long* elapsed_time){
     
     printf("%s\n", file);
     fp = fopen(file, "w");
-    for(int i = 1; i <= 64; i++){
+    for(int i = 1; i <= 62; i++){
         fprintf(fp, "size = %d\n", 256 * i);
         fprintf(fp, "%lld ns\n", elapsed_time[i]);
     }
@@ -75,7 +75,7 @@ int main (int argc, char *argv[])
         memset(buf, 0, MAX_SIZE);
         result = SSL_connect(ssl);
         if (result == 1) {
-            for(int i = 1; i <= 64; i++){
+            for(int i = 1; i <= 62; i++){
                 int size = 256 * i;
                 printf("size = %d\n", size);
                 clock_gettime(CLOCK_MONOTONIC, &start);
