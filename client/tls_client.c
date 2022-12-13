@@ -75,7 +75,7 @@ int main (int argc, char *argv[])
         memset(buf, 0, MAX_SIZE);
         result = SSL_connect(ssl);
         if (result == 1) {
-            for(int i = 1; i <= 72; i++){
+            for(int i = 1; i <= 64; i++){
                 int size = 256 * i;
                 printf("size = %d\n", size);
                 clock_gettime(CLOCK_MONOTONIC, &start);
