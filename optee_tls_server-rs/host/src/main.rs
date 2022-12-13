@@ -15,25 +15,26 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub enum Command {
-    NewTlsSession,
-    CloseTlsSession,
-    DoTlsRead,
-    DoTlsWrite,
-    Unknown,
+use optee_teec::{Context, Operation, Session, Uuid};
+use optee_teec::{ParamNone, ParamTmpRef, ParamType, ParamValue};
+use proto::{Command, UUID};
+
+
+fn main() -> optee_teec::Result<()> {
+    let mut ctx = Context::new()?;
+    let uuid = Uuid::parse_str(UUID).unwrap();
+    let mut ta_session = ctx.open_session(uuid)?;
+    let mut session_id: u32 = 0;
+    deploy_server(&mut ta_session, session_id);
+    println!("Success");
+    Ok(())
 }
 
-impl From<u32> for Command {
-    #[inline]
-    fn from(value: u32) -> Command {
-        match value {
-            0 => Command::NewTlsSession,
-            1 => Command::CloseTlsSession,
-            2 => Command::DoTlsRead,
-            3 => Command::DoTlsWrite,
-            _ => Command::Unknown,
-        }
-    }
+fn deploy_server(ta_session: &mut Session, session_id: u32) -> optee_teec::Result<()> {
+    let p0 = ParamValue::new(session_id, 0, ParamType::ValueInput);
+    let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
+    ta_session.invoke_command(Command::DeployServer as u32, &mut operation)?;
+    Ok(())
 }
 
-pub const UUID: &str = &include_str!(concat!(env!("OUT_DIR"), "/uuid.txt"));
+

@@ -41,6 +41,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "optee_tls_server-rs"
+version = "0.2.0"
+dependencies = [
+ "libc",
+ "optee-teec",
+ "proto",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "0.4.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -74,15 +83,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-xid",
-]
-
-[[package]]
-name = "tls_server-rs"
-version = "0.2.0"
-dependencies = [
- "libc",
- "optee-teec",
- "proto",
 ]
 
 [[package]]

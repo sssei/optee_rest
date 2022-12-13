@@ -15,19 +15,31 @@
 # specific language governing permissions and limitations
 # under the License.
 
-[package]
-name = "tls_server-rs"
-version = "0.2.0"
-authors = ["Teaclave Contributors <dev@teaclave.apache.org>"]
-license = "Apache-2.0"
-repository = "https://github.com/apache/incubator-teaclave-trustzone-sdk.git"
-description = "An example of Rust OP-TEE TrustZone SDK."
-edition = "2018"
+NAME := optee_tls_server-rs
+ARCH ?= aarch64
 
-[dependencies]
-libc = "0.2.48"
-proto = { path = "../proto" }
-optee-teec = { path = "../../../optee-teec" }
+OPTEE_DIR ?= ../../../optee
 
-[profile.release]
-lto = true
+ifeq ($(ARCH), arm)
+	OPTEE_BIN := $(OPTEE_DIR)/toolchains/aarch32/bin
+	OBJCOPY := $(OPTEE_BIN)/arm-linux-gnueabihf-objcopy
+	TARGET := arm-unknown-linux-gnueabihf
+else
+	OPTEE_BIN := $(OPTEE_DIR)/toolchains/$(ARCH)/bin
+	OBJCOPY := $(OPTEE_BIN)/aarch64-linux-gnu-objcopy
+	TARGET := aarch64-unknown-linux-gnu
+endif
+
+OUT_DIR := $(CURDIR)/target/$(TARGET)/release
+
+
+all: host strip
+
+host:
+	@cargo build -v --target $(TARGET) --release
+
+strip:
+	@$(OBJCOPY) --strip-unneeded $(OUT_DIR)/$(NAME) $(OUT_DIR)/$(NAME)
+
+clean:
+	@cargo clean
