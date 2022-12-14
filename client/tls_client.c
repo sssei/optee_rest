@@ -5,7 +5,7 @@
 #include <time.h>
 #include <errno.h>
 
-#define MAX_SIZE 256 * 72 
+#define MAX_SIZE 256 * 62
 #define ITER 100
 
 static void measure(SSL* ssl, char* buf, size_t size){
@@ -54,7 +54,7 @@ int main (int argc, char *argv[])
     SSL_CTX *ctx;
     SSL *ssl;
     struct timespec start, end;
-    long long elapsed_time[72];
+    long long elapsed_time[62];
 
     ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_use_certificate_file(ctx, "cacert.pem", SSL_FILETYPE_PEM);
