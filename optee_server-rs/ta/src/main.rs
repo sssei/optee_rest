@@ -20,20 +20,22 @@
 use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session, trace_println,
 };
-use optee_utee::{DataFlag, ObjectStorageConstants, PersistentObject};
+
 use optee_utee::{Error, ErrorKind, Parameters, Result};
 use optee_utee::net::TcpStream;
 use proto::Command;
+use std::io::{Read, Write};
 
-use rustls;
-use rustls::{NoClientAuth, Session};
-use std::io::Cursor;
-use std::io::{BufReader, Read, Write};
-use std::sync::Arc;
+mod tls;
+mod http;
+mod file;
+
+use http::HttpParseState;
 
 const MAX_PAYLOAD: u16 = 16384 + 2048;
 const HEADER_SIZE: u16 = 1 + 2 + 2;
 pub const MAX_WIRE_SIZE: usize = (MAX_PAYLOAD + HEADER_SIZE) as usize;
+
 
 #[ta_create]
 fn create() -> Result<()> {
@@ -77,7 +79,8 @@ pub fn deploy_server() {
     trace_println!("[+] deploy_server");
     stream.accept().unwrap();
 
-    let mut tls_session = new_tls_session();
+    let mut tls_session = tls::new_tls_session();
+    let mut http_state = HttpParseState::Start;
     loop {
         let mut plain_buf : Vec<u8> = Vec::new();
         let mut response : Vec<u8> = Vec::new();
@@ -85,9 +88,9 @@ pub fn deploy_server() {
         match stream.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
-                do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
+                tls::do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
                 if !plain_buf.is_empty() {
-                    handle_request(&mut plain_buf, &mut response);
+                    http::handle_request(&mut plain_buf, &mut response, &mut http_state);
                 }
             }
             Err(_) => {
@@ -95,174 +98,11 @@ pub fn deploy_server() {
                 break;
             }
         }
-        let n = do_tls_write(&mut tls_session, &mut buf, &response);
+        let n = tls::do_tls_write(&mut tls_session, &mut buf, &response);
         stream.write(&buf[..n]).unwrap();
-    }
-    
-}
-
-fn handle_request(plain_buf : &mut Vec<u8>, response : &mut Vec<u8>) {
-    let res = plain_buf.iter().map(|&s| s as char).collect::<String>();
-    let request : Vec<&str> = res.split("\r\n").collect();
-    trace_println!("{:?}", request);
-    let mut res_header : Vec<u8> = b"HTTP 200 OK\r\n".to_vec();
-    match request[0] {
-        "POST /config " => {
-            if request.len() != 3 {
-                trace_println!("Bad request");
-                panic!();
-            }
-            handle_post(request[1]);
-            response.append(&mut res_header);
+        if http_state == HttpParseState::Finish {
+            http_state = HttpParseState::Start;
         }
-        "GET /config " => {
-            if request.len() != 2 {
-                trace_println!("Bad request");
-                panic!();
-            }
-            handle_get(response);
-        }
-        _ => {
-            trace_println!("Bad request");
-            panic!();
-        }
-    }
-} 
-
-fn handle_post(body: &str){
-    let bytes : &[u8] = body.as_bytes();
-    create_raw_object(bytes.to_vec()).unwrap();
-}
-
-fn handle_get(data: &mut Vec<u8>){
-    read_raw_object(data).unwrap();
-}
-
-fn create_raw_object(data: Vec<u8>) -> Result<()> {
-    let mut obj_id = vec![0, 1, 2, 3, 4];
-
-    let obj_data_flag = DataFlag::ACCESS_READ
-        | DataFlag::ACCESS_WRITE
-        | DataFlag::ACCESS_WRITE_META
-        | DataFlag::OVERWRITE;
-
-    let mut init_data: [u8; 0] = [0; 0];
-
-    match PersistentObject::create(
-        ObjectStorageConstants::Private,
-        &mut obj_id,
-        obj_data_flag,
-        None,
-        &mut init_data,
-    ) {
-        Err(e) => {
-            return Err(e);
-        }
-
-        Ok(mut object) => match object.write(&data) {
-            Ok(()) => {
-                return Ok(());
-            }
-            Err(e_write) => {
-                object.close_and_delete()?;
-                std::mem::forget(object);
-                return Err(e_write);
-            }
-        },
-    }
-}
-
-fn read_raw_object(data: &mut Vec<u8>) -> Result<()> {
-    let mut obj_id = vec![0, 1, 2, 3, 4];
-
-    match PersistentObject::open(
-        ObjectStorageConstants::Private,
-        &mut obj_id,
-        DataFlag::ACCESS_READ | DataFlag::SHARE_READ,
-    ) {
-        Err(e) => return Err(e),
-
-        Ok(object) => {
-            let obj_info = object.info()?;
-            let obj_size = obj_info.data_size(); 
-            data.resize(obj_size, 0);
-            let read_bytes = object.read(data).unwrap();
-
-            if read_bytes != obj_info.data_size() as u32 {
-                return Err(Error::new(ErrorKind::ExcessData));
-            }
-
-            Ok(())
-        }
-    }
-}
-
-pub fn new_tls_session() -> rustls::ServerSession {
-    let tls_config = make_config();
-    rustls::ServerSession::new(&tls_config)
-}
-
-fn do_tls_read(tls_session: &mut rustls::ServerSession, encrypted_buf: &[u8], plain_buf: &mut Vec<u8>){
-    let mut rd = Cursor::new(encrypted_buf);
-    let _rc = tls_session.read_tls(&mut rd).unwrap();
-    let _process =  tls_session.process_new_packets().unwrap();
-    let _rc = tls_session.read_to_end(plain_buf);
-}
-
-fn do_tls_write(tls_session: &mut rustls::ServerSession, encrypted_buf: &mut [u8], plain_buf: &[u8]) -> usize {
-    if !plain_buf.is_empty() {
-        tls_session.write_all(&plain_buf).unwrap();
-    }
-    let mut wr = Cursor::new(encrypted_buf);
-    let mut rc = 0;
-    while tls_session.wants_write() {
-        rc += tls_session.write_tls(&mut wr).unwrap();
-    }
-    rc
-}
-
-fn make_config() -> Arc<rustls::ServerConfig> {
-    let client_auth = NoClientAuth::new();
-    let mut tls_config = rustls::ServerConfig::new(client_auth);
-    let certs = load_certs();
-    let privkey = load_private_key();
-    tls_config
-        .set_single_cert(certs, privkey)
-        .expect("bad certificates/private key");
-
-    Arc::new(tls_config)
-}
-
-fn load_certs() -> Vec<rustls::Certificate> {
-    let bytes = include_bytes!("../test-ca/ecdsa/end.fullchain").to_vec();
-    let cursor = std::io::Cursor::new(bytes);
-    let mut reader = BufReader::new(cursor);
-    rustls::internal::pemfile::certs(&mut reader).unwrap()
-}
-
-fn load_private_key() -> rustls::PrivateKey {
-    let bytes = include_bytes!("../test-ca/ecdsa/end.key").to_vec();
-
-    let rsa_keys = {
-        let cursor = std::io::Cursor::new(bytes.clone());
-        let mut reader = BufReader::new(cursor);
-        rustls::internal::pemfile::rsa_private_keys(&mut reader)
-            .expect("file contains invalid rsa private key")
-    };
-
-    let pkcs8_keys = {
-        let cursor = std::io::Cursor::new(bytes);
-        let mut reader = BufReader::new(cursor);
-        rustls::internal::pemfile::pkcs8_private_keys(&mut reader)
-            .expect("file contains invalid pkcs8 private key (encrypted keys not supported)")
-    };
-
-    // prefer to load pkcs8 keys
-    if !pkcs8_keys.is_empty() {
-        pkcs8_keys[0].clone()
-    } else {
-        assert!(!rsa_keys.is_empty());
-        rsa_keys[0].clone()
     }
 }
 
