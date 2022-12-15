@@ -20,24 +20,22 @@
 use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session, trace_println,
 };
+
 use optee_utee::{Error, ErrorKind, Parameters, Result};
 use optee_utee::net::TcpStream;
 use proto::Command;
+use std::io::{Read, Write};
 
-use lazy_static::lazy_static;
-use rustls;
-use rustls::{NoClientAuth, Session};
-use std::collections::HashMap;
-use std::io::Cursor;
-use std::io::{BufReader, Read, Write};
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::RwLock;
+mod tls;
+mod http;
+mod file;
 
-lazy_static! {
-    static ref TLS_SESSIONS: RwLock<HashMap<u32, Mutex<rustls::ServerSession>>> =
-        RwLock::new(HashMap::new());
-}
+use http::HttpParseState;
+
+const MAX_PAYLOAD: u16 = 16384 + 2048;
+const HEADER_SIZE: u16 = 1 + 2 + 2;
+pub const MAX_WIRE_SIZE: usize = (MAX_PAYLOAD + HEADER_SIZE) as usize;
+
 
 #[ta_create]
 fn create() -> Result<()> {
@@ -67,151 +65,44 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
     let session_id = unsafe { params.0.as_value().unwrap().a() };
     trace_println!("[+] session id: {}", session_id);
     match Command::from(cmd_id) {
-        Command::NewTlsSession => {
-            trace_println!("[+] new_tls_session");
-            new_tls_session(session_id);
-            Ok(())
-        }
-        Command::DoTlsRead => {
-            let mut p1 = unsafe { params.1.as_memref().unwrap() };
-            let mut p2 = unsafe { params.2.as_value().unwrap() };
-            let buffer = p1.buffer();
-            trace_println!("[+] do_tls_read");
-            let flag = do_tls_read(session_id, buffer);
-            p2.set_a(flag as u32);
-            Ok(())
-        }
-        Command::DoTlsWrite => {
-            trace_println!("[+] do_tls_write");
-            let mut p1 = unsafe { params.1.as_memref().unwrap() };
-            let mut p2 = unsafe { params.2.as_value().unwrap() };
-            let mut buffer = p1.buffer();
-            let n = do_tls_write(session_id, &mut buffer);
-            p2.set_a(n as u32);
-            Ok(())
-        }
-        Command::CloseTlsSession => {
-            trace_println!("[+] close_tls_session");
-            close_tls_session(session_id);
-            Ok(())
-        }
         Command::DeployServer => {
             trace_println!("[+] socket_listen");
-            deploy_server(session_id);
+            deploy_server();
             Ok(())
         }
         _ => Err(Error::new(ErrorKind::BadParameters)),
     }
 }
 
-pub fn deploy_server(session_id: u32) {
+pub fn deploy_server() {
     let mut stream = TcpStream::listen("0.0.0.0", 8089).unwrap();
     trace_println!("[+] deploy_server");
     stream.accept().unwrap();
-    let mut buf = [0u8; 1024];
+
+    let mut tls_session = tls::new_tls_session();
+    let mut http_state = HttpParseState::Start;
     loop {
+        let mut plain_buf : Vec<u8> = Vec::new();
+        let mut response : Vec<u8> = Vec::new();
+        let mut buf = [0u8; MAX_WIRE_SIZE];
         match stream.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
-/*                 trace_println!("[+] Received message"); */
-                let converted: String = String::from_utf8(buf[0..n].to_vec()).unwrap();
-/*                 trace_println!("{:?}", converted); */
-                stream.write(&buf[0..n]).unwrap();
+                tls::do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
+                if !plain_buf.is_empty() {
+                    http::handle_request(&mut plain_buf, &mut response, &mut http_state);
+                }
             }
             Err(_) => {
                 trace_println!("Read Error");
+                break;
             }
         }
-    }
-    
-}
-
-pub fn new_tls_session(session_id: u32) {
-    let tls_config = make_config();
-    let tls_session = rustls::ServerSession::new(&tls_config);
-    TLS_SESSIONS
-        .write()
-        .unwrap()
-        .insert(session_id, Mutex::new(tls_session));
-}
-
-pub fn close_tls_session(session_id: u32) {
-    TLS_SESSIONS.write().unwrap().remove(&session_id);
-}
-
-pub fn do_tls_read(session_id: u32, buf: &[u8]) -> bool {
-    let mut rd = Cursor::new(buf);
-    let ts_guard = TLS_SESSIONS.read().unwrap();
-    let mut tls_session = ts_guard.get(&session_id).unwrap().lock().unwrap();
-    let _rc = tls_session.read_tls(&mut rd).unwrap();
-    let _process =  tls_session.process_new_packets().unwrap();
-
-        // Read and process all available plaintext.
-    let mut buf = Vec::new();
-    let _rc = tls_session.read_to_end(&mut buf);
-    let plain_text: String = String::from_utf8(buf.clone()).unwrap();
-
-    if !buf.is_empty() {
-        tls_session.write_all(&buf).unwrap();
-    }
-
-    plain_text.contains("Done")
-}
-
-pub fn do_tls_write(session_id: u32, buf: &mut [u8]) -> usize {
-    let ts_guard = TLS_SESSIONS.read().unwrap();
-    let mut tls_session = ts_guard.get(&session_id).unwrap().lock().unwrap();
-    let mut wr = Cursor::new(buf);
-    let mut rc = 0;
-    while tls_session.wants_write() {
-        rc += tls_session.write_tls(&mut wr).unwrap();
-    }
-
-    rc
-}
-
-fn make_config() -> Arc<rustls::ServerConfig> {
-    let client_auth = NoClientAuth::new();
-    let mut tls_config = rustls::ServerConfig::new(client_auth);
-    let certs = load_certs();
-    let privkey = load_private_key();
-    tls_config
-        .set_single_cert(certs, privkey)
-        .expect("bad certificates/private key");
-
-    Arc::new(tls_config)
-}
-
-fn load_certs() -> Vec<rustls::Certificate> {
-    let bytes = include_bytes!("../test-ca/ecdsa/end.fullchain").to_vec();
-    let cursor = std::io::Cursor::new(bytes);
-    let mut reader = BufReader::new(cursor);
-    rustls::internal::pemfile::certs(&mut reader).unwrap()
-}
-
-fn load_private_key() -> rustls::PrivateKey {
-    let bytes = include_bytes!("../test-ca/ecdsa/end.key").to_vec();
-
-    let rsa_keys = {
-        let cursor = std::io::Cursor::new(bytes.clone());
-        let mut reader = BufReader::new(cursor);
-        rustls::internal::pemfile::rsa_private_keys(&mut reader)
-            .expect("file contains invalid rsa private key")
-    };
-
-    let pkcs8_keys = {
-        let cursor = std::io::Cursor::new(bytes);
-        let mut reader = BufReader::new(cursor);
-        rustls::internal::pemfile::pkcs8_private_keys(&mut reader)
-            .expect("file contains invalid pkcs8 private key (encrypted keys not supported)")
-    };
-
-    // prefer to load pkcs8 keys
-    if !pkcs8_keys.is_empty() {
-        pkcs8_keys[0].clone()
-    } else {
-        assert!(!rsa_keys.is_empty());
-        rsa_keys[0].clone()
+        let n = tls::do_tls_write(&mut tls_session, &mut buf, &response);
+        stream.write(&buf[..n]).unwrap();
+        if http_state == HttpParseState::Finish {
+            http_state = HttpParseState::Start;
+        }
     }
 }
 

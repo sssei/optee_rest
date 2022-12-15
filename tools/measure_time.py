@@ -1,33 +1,60 @@
 import sys 
 import re 
+import datetime 
 import matplotlib.pyplot as plt 
 
-file_name = sys.argv[1]
-save_file = sys.argv[2]
+if len(sys.argv) != 4:
+    print("Usage : python3 %s <tee_file> <normal_file> <title> " % sys.argv[0])
+    sys.exit()
 
-f = open(file_name, 'r')
-datalist = f.readlines()
+tee_file = sys.argv[1] 
+normal_file = sys.argv[2]
+title = sys.argv[3]
+
+f1 = open(tee_file, 'r')
+f2 = open(normal_file, 'r')
+data_tee = f1.readlines()
+data_normal = f2.readlines()
 
 x = []
-y = []
+y_tee = []
+y_normal = []
 
-it = iter(datalist)
-for i, j in zip(it, it):
+it1 = iter(data_tee)
+for i, j in zip(it1, it1):
     size = int(re.search(r'\d+', i).group())
-    time = 1/2 * float(re.search(r'\d+\.\d+', j).group())
-    time_unit = 1 
-    if 'm' in j : 
-        time_unit = 0.001
-    elif 'µ' in j:
-        time_unit = 0.001 * 0.001
-    
-    time = time * time_unit 
-    mb_per_sec = size / time * 0.001 * 0.001 # for G 
+    time = float(re.search(r'\d+', j).group())
+    time_unit = 1000 * 1000 * 1000
+    msec = time / time_unit * 1000 
     x.append(size)
-    y.append(mb_per_sec)
+    y_tee.append(msec)
 
+it2 = iter(data_normal)
+n = 0
+for i, j in zip(it2, it2):
+    size = int(re.search(r'\d+', i).group())
+    time = float(re.search(r'\d+', j).group())
+    time_unit = 1000 * 1000 * 1000 
+    msec = time / time_unit * 1000 
+    if x[n] != size :
+        print("size error")
+        sys.exit()
+    n += 1
+    y_normal.append(msec)
+
+dt_now = datetime.datetime.now()
+file_name = dt_now.strftime("%Y-%m-%d_%H-%M")
+
+fig = plt.figure()
+plt.title(title)
+plt.plot(x, y_tee, label='TEE')
+plt.plot(x, y_normal, label='REE')
 plt.xlabel("byte size")
-plt.ylabel("GB/sec")
-plt.plot(x, y)
+plt.ylabel("RTT(ms)")
+#plt.yscale("log")
+plt.legend()
+plt.ylim(bottom=0)
 plt.grid()
-plt.savefig(save_file)
+fig.savefig(file_name + ".png")
+
+
