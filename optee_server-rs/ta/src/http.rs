@@ -11,7 +11,7 @@ pub enum HttpParseState {
     BodyIncomplete,
 }
 
-fn parse_start(request: String, http_state: &mut HttpParseState) -> Vec<&str> {
+fn parse_start<'a>(request: &'a String, http_state: &'a mut HttpParseState) -> Vec<&'a str> {
     let res : Vec<&str> = request.split("\r\n").collect();
     let request_line : Vec<&str> = res[0].split(" ").collect();
     if request_line.len() != 3 {
@@ -54,9 +54,9 @@ fn parse_start(request: String, http_state: &mut HttpParseState) -> Vec<&str> {
     panic!();
 }
 
-fn parse_request(request: String, http_state: &mut HttpParseState) -> Vec<&str> {
+fn parse_request<'a>(request: &'a String, http_state: &'a mut HttpParseState) -> Vec<&'a str> {
     match http_state {
-        HttpParseState::Start => parse_start(request, http_state),
+        HttpParseState::Start => parse_start(&request, http_state),
         HttpParseState::BodyStart => vec!["N", "N", "N"],
         HttpParseState::BodyIncomplete => vec!["N", "N", "N"],
         _ => vec!["N", "N", "N"],
@@ -65,7 +65,7 @@ fn parse_request(request: String, http_state: &mut HttpParseState) -> Vec<&str> 
 
 pub fn handle_request(plain_buf : &mut Vec<u8>, response : &mut Vec<u8>, http_state: &mut HttpParseState) {
     let res = plain_buf.iter().map(|&s| s as char).collect::<String>();
-    let request = parse_request(res, http_state);    
+    let request = parse_request(&res, http_state);    
     trace_println!("Request is {:?}", request);
     let mut res_header : Vec<u8> = b"HTTP 200 OK\r\n".to_vec();
     match request[0] {
