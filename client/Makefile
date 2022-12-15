@@ -3,3 +3,6 @@ tls_client:
 
 http_client:
 	gcc -Wall http_client.c -o http_client -lcrypto -lssl 	
+
+clean: 
+	rm -rf http_client tls_client 

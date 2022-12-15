@@ -87,17 +87,14 @@ int main (int argc, char *argv[])
                 perror("SSL_write");
                 exit(1);
             }
-            len = 0;
-            while(1){
-                int res = SSL_read(ssl, buf, size);
-                len += res;
-                if(res < 0){
-                    perror("SSL_read");
-                    exit(1);
-                }else if(len == size){
-                    break;
-                }
-            }            
+            int res = SSL_read(ssl, buf, size);
+            if(res < 0){
+                perror("SSL_read");
+                exit(1);
+            }else{
+                printf("%s\n", buf);
+            }
+
 /*             for(int i = 1; i <= 1; i++){
                 int size = 256 * i;
                 printf("size = %d\n", size);
