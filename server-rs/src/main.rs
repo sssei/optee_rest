@@ -9,6 +9,9 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
 
+mod http;
+use http::HttpParseState;
+
 const MAX_PAYLOAD: u16 = 16384 + 2048;
 const HEADER_SIZE: u16 = 1 + 2 + 2;
 pub const MAX_WIRE_SIZE: usize = (MAX_PAYLOAD + HEADER_SIZE) as usize;
@@ -35,29 +38,32 @@ fn handle_client(
 ) {
     println!("new session");
     let mut tls_session = new_tls_session();
+    let mut http_state = HttpParseState::Start;
     loop {
         let mut buf = [0u8; MAX_WIRE_SIZE];
         let mut plain_buf : Vec<u8> = Vec::new();
-/*         println!("stream read"); */
+        let mut response : Vec<u8> = Vec::new();
         match stream.read(&mut buf) {
             Ok(0) | Err(_) => {
                 println!("close session");
                 break;
             }
             Ok(n) => {
-/*                 println!("read bytes: {}", n); */
+                println!("read bytes: {}", n);
                 do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
+                if !plain_buf.is_empty() {
+                    http::handle_request(&mut plain_buf, &mut response, &mut http_state);
+                }
             }
         }
 
-        let n = do_tls_write(&mut tls_session, &mut buf, &plain_buf);
-/*         println!("stream write n: {}", n); */
-        let res = stream.write_all(&buf[..n]);
-
-        if res.is_err(){
-            println!("close session");
-            break;
+        let n = do_tls_write(&mut tls_session, &mut buf, &response);
+        println!("stream write n: {}", n);
+        stream.write_all(&buf[..n]).unwrap();
+        if http_state == HttpParseState::Finish {
+            http_state = HttpParseState::Start;
         }
+
     }
 }
 
