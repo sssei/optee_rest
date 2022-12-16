@@ -5,7 +5,6 @@ use crate::file;
 pub enum HttpParseState {
     Start,
     Finish,
-    Get,
     Post,
     BodyStart,
     BodyIncomplete,
@@ -13,7 +12,7 @@ pub enum HttpParseState {
 
 fn parse_start<'a>(request: &'a String, http_state: &'a mut HttpParseState) -> Vec<&'a str> {
     let res : Vec<&str> = request.split("\r\n").collect();
-    let request_line : Vec<&str> = res[0].split(" ").collect();
+    let request_line : Vec<&str> = res[0].split_whitespace().collect();
     if request_line.len() != 3 {
         trace_println!("Request Line size is bad");
         panic!();
@@ -35,7 +34,8 @@ fn parse_start<'a>(request: &'a String, http_state: &'a mut HttpParseState) -> V
     for r in &res[1..] {
         let field = "Content-Length: ";
         if r.contains(field) {
-            content_length = r[field.len()..].parse::<usize>().unwrap();
+            let res : String = r[field.len()..].split_whitespace().collect();
+            content_length = res.parse::<usize>().unwrap();
         }else if r.len() == 0 {
             *http_state = HttpParseState::BodyStart;
         }else if *http_state == HttpParseState::BodyStart {
@@ -66,7 +66,7 @@ fn parse_request<'a>(request: &'a String, http_state: &'a mut HttpParseState) ->
 pub fn handle_request(plain_buf : &mut Vec<u8>, response : &mut Vec<u8>, http_state: &mut HttpParseState) {
     let res = plain_buf.iter().map(|&s| s as char).collect::<String>();
     let request = parse_request(&res, http_state);    
-    trace_println!("Request is {:?}", request);
+    trace_println!("Request is {:?}", request[0]);
     let mut res_header : Vec<u8> = b"HTTP 200 OK\r\n".to_vec();
     match request[0] {
         "POST" => {

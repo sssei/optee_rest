@@ -99,7 +99,7 @@ pub fn deploy_server() {
             }
         }
         let n = tls::do_tls_write(&mut tls_session, &mut buf, &response);
-        stream.write(&buf[..n]).unwrap();
+        stream.write_all(&buf[..n]).unwrap();
         if http_state == HttpParseState::Finish {
             http_state = HttpParseState::Start;
         }
