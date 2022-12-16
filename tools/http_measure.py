@@ -27,8 +27,8 @@ for s, l1, l2, l3 in zip(it1, it1, it1, it1):
     get_time = float(re.search(r'\d+', l2).group()) / (1000 * 1000)
     delete_time = float(re.search(r'\d+', l3).group()) / (1000 * 1000)
     x.append(size)
-    y1_tee.append(get_time)
-    y2_tee.append(post_time)    
+    y1_tee.append(post_time)
+    y2_tee.append(get_time)    
     y3_tee.append(delete_time)        
 
 it2 = iter(data_normal)
@@ -42,8 +42,8 @@ for s, l1, l2, l3 in zip(it2, it2, it2, it2):
         print("size error")
         sys.exit()
     n += 1
-    y1_normal.append(get_time)
-    y2_normal.append(post_time)
+    y1_normal.append(post_time)
+    y2_normal.append(get_time)
     y3_normal.append(delete_time)        
 
 dt_now = datetime.datetime.now()
