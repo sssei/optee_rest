@@ -1,5 +1,6 @@
-use optee_utee::trace_println;
-use crate::file;
+use std::fs::File;
+use std::fs;
+use std::io::{Write, Read};
 
 #[derive(PartialEq)]
 pub enum HttpParseState {
@@ -14,7 +15,7 @@ fn parse_start<'a>(request: &'a String, http_state: &'a mut HttpParseState) -> V
     let res : Vec<&str> = request.split("\r\n").collect();
     let request_line : Vec<&str> = res[0].split_whitespace().collect();
     if request_line.len() != 3 {
-        trace_println!("Request Line size is bad");
+        println!("Request Line size is bad");
         panic!();
     }
     let uri = request_line[1];
@@ -29,7 +30,7 @@ fn parse_start<'a>(request: &'a String, http_state: &'a mut HttpParseState) -> V
             return vec!["DELETE", uri];
         }
         _ => {
-            trace_println!("Request method is bad");
+            println!("Request method is bad");
             panic!();
         }
     }
@@ -48,12 +49,12 @@ fn parse_start<'a>(request: &'a String, http_state: &'a mut HttpParseState) -> V
                 return vec!["POST", uri, r];
             }else {
                 *http_state = HttpParseState::BodyIncomplete;
-                trace_println!("body size not content-length");
+                println!("body size not content-length");
                 panic!();
             }
         }
     }
-    trace_println!("Request header is bad");
+    println!("Request header is bad");
     panic!();
 }
 
@@ -79,14 +80,14 @@ pub fn handle_request(plain_buf : &mut Vec<u8>, response : &mut Vec<u8>, http_st
             response.append(&mut b"0\r\n\r\n".to_vec());
         }
         "GET" => {
-            handle_get(uri, response)
+            handle_get(uri, response);
         }
         "DELETE" => {
             handle_delete(uri);
-            response.append(&mut b"0\r\n\r\n".to_vec());            
+            response.append(&mut b"0\r\n\r\n".to_vec());                        
         }
         _ => {
-            trace_println!("bad request");
+            println!("bad request");
             panic!();
         }
     }
@@ -94,17 +95,19 @@ pub fn handle_request(plain_buf : &mut Vec<u8>, response : &mut Vec<u8>, http_st
 
 fn handle_post(uri: &str, body: &str){
     let bytes : &[u8] = body.as_bytes();
-    file::create_raw_object(uri, bytes.to_vec()).unwrap();
+    let mut file = File::create(uri).unwrap();
+    file.write_all(bytes).unwrap();
 }
 
 fn handle_get(uri: &str, response: &mut Vec<u8>) {
-    let mut data : Vec<u8> = Vec::new();
-    let size = file::read_raw_object(uri, &mut data).unwrap();
+    let mut data = String::new();
+    let mut file = File::open(uri).unwrap();
+    let size = file.read_to_string(&mut data).unwrap();
     response.append(&mut size.to_string().as_bytes().to_vec());
     response.append(&mut b"\r\n\r\n".to_vec());
-    response.append(&mut data);
+    response.append(&mut data.as_bytes().to_vec());
 }
 
 fn handle_delete(uri: &str){
-    file::delete_object(uri).unwrap();
+    fs::remove_file(uri).unwrap();
 }
