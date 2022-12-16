@@ -39,7 +39,7 @@ static void log_file(long long* elapsed_time){
     
     printf("%s\n", file);
     fp = fopen(file, "w");
-    for(int i = 1; i <= 62; i++){
+    for(int i = 1; i < 62; i++){
         fprintf(fp, "size = %d\n", 256 * i);
         fprintf(fp, "%lld ns\n", elapsed_time[i]);
     }
