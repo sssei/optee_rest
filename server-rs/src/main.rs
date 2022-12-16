@@ -49,7 +49,6 @@ fn handle_client(
                 break;
             }
             Ok(n) => {
-                println!("read bytes: {}", n);
                 do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
                 if !plain_buf.is_empty() {
                     http::handle_request(&mut plain_buf, &mut response, &mut http_state);
@@ -58,7 +57,6 @@ fn handle_client(
         }
 
         let n = do_tls_write(&mut tls_session, &mut buf, &response);
-        println!("stream write n: {}", n);
         stream.write_all(&buf[..n]).unwrap();
         if http_state == HttpParseState::Finish {
             http_state = HttpParseState::Start;
