@@ -5,29 +5,8 @@
 #include <time.h>
 #include <errno.h>
 
-#define MAX_SIZE 256 * 72 
+#define MAX_SIZE 256 * 62
 #define ITER 100
-
-static void measure(SSL* ssl, char* buf, size_t size){
-    for(int i = 0; i < 100; i++){
-        int len = SSL_write(ssl, buf, size);
-        if(len != size){
-            perror("SSL_write");
-            exit(1);
-        }
-        len = 0;
-        while(1){
-            int res = SSL_read(ssl, buf, size);
-            len += res;
-            if(res < 0){
-                perror("SSL_read");
-                exit(1);
-            }else if(len == size){
-                break;
-            }
-        }
-    }
-}
 
 static void log_file(long long* elapsed_time){
     FILE* fp;
@@ -46,20 +25,89 @@ static void log_file(long long* elapsed_time){
     fclose(fp);
 }
 
+long long post_request(SSL *ssl, int body_size){
+    struct timespec start, end;    
+    char post_buf[MAX_SIZE];
+    char response_buf[MAX_SIZE];
+    memset(post_buf, 0, MAX_SIZE);
+    int header_size = sprintf(post_buf, "POST /config HTTP\r\nContent-Length: %5d\r\n\r\n", body_size);
+    int request_size = header_size + body_size;
+    long long elapsed_time;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);        
+    int len = SSL_write(ssl, post_buf, request_size);
+    if (len != request_size){
+        perror("SSL_write");
+        exit(1);
+    }
+    int res = SSL_read(ssl, response_buf, MAX_SIZE);
+    if(res < 0){
+        perror("SSL_read");
+        exit(1);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &end);        
+    elapsed_time = 1000 * 1000 * 1000 * (end.tv_sec - start.tv_sec);
+    elapsed_time += end.tv_nsec - start.tv_nsec;         
+    return elapsed_time;
+}
+
+long long get_request(SSL *ssl){
+    struct timespec start, end;    
+    char response_buf[MAX_SIZE];
+    memset(response_buf, 0, MAX_SIZE);
+    char header[] = "GET /config HTTP\r\nContent-Length: 0\r\n\r\n";
+    int header_size = strlen(header);
+    long long elapsed_time;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);        
+    int len = SSL_write(ssl, header, header_size);
+    if (len != header_size){
+        perror("SSL_write");
+        exit(1);
+    }
+    int res = SSL_read(ssl, response_buf, MAX_SIZE);
+    if(res < 0){
+        perror("SSL_read");
+        exit(1);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &end);        
+    elapsed_time = 1000 * 1000 * 1000 * (end.tv_sec - start.tv_sec);
+    elapsed_time += end.tv_nsec - start.tv_nsec;         
+    return elapsed_time;
+}
+
+long long delete_request(SSL *ssl){
+    struct timespec start, end;
+    char response_buf[MAX_SIZE];
+    memset(response_buf, 0, MAX_SIZE);
+    char header[] = "DELETE /config HTTP\r\nContent-Length: 0\r\n\r\n";
+    int header_size = strlen(header);
+    long long elapsed_time;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);    
+    int len = SSL_write(ssl, header, header_size);
+    if (len != header_size){
+        perror("SSL_write");
+        exit(1);
+    }
+    int res = SSL_read(ssl, response_buf, MAX_SIZE);
+    if(res < 0){
+        perror("SSL_read");
+        exit(1);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &end);   
+    elapsed_time = 1000 * 1000 * 1000 * (end.tv_sec - start.tv_sec);
+    elapsed_time += end.tv_nsec - start.tv_nsec;         
+    return elapsed_time;
+}
+
 int main (int argc, char *argv[])
 {
     int s, result;
     struct sockaddr_in srv_addr;
     SSL_CTX *ctx;
     SSL *ssl;
-    struct timespec start, end;
-    long long elapsed_time[72];
-    char post_header[] = "POST /config \r\n";
-    char get_buf[] = "GET /config \r\n";
-    int post_len = strlen(post_header);
-    int get_len = strlen(get_buf);
-    char post_buf[MAX_SIZE + post_len];
-    char buf[MAX_SIZE];
+    long long elapsed_time[3 * 256 * 62];
 
     ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_use_certificate_file(ctx, "cacert.pem", SSL_FILETYPE_PEM);
@@ -76,39 +124,21 @@ int main (int argc, char *argv[])
     if (result != 0) {
         perror("connect");
         return 1;
-    } else {
-        memset(post_buf, 0, MAX_SIZE + post_len);
-        memcpy(post_buf, post_header, post_len);
-        result = SSL_connect(ssl);
-        if (result == 1) {
-            int size = 1024;
-            int len = SSL_write(ssl, post_buf, size);
-            if(len != size){
-                perror("SSL_write");
-                exit(1);
-            }
-            int res = SSL_read(ssl, buf, size);
-            if(res < 0){
-                perror("SSL_read");
-                exit(1);
-            }else{
-                printf("%s\n", buf);
-            }
-
-/*             for(int i = 1; i <= 1; i++){
-                int size = 256 * i;
-                printf("size = %d\n", size);
-                clock_gettime(CLOCK_MONOTONIC, &start);
-                measure(ssl, buf, size);
-                clock_gettime(CLOCK_MONOTONIC, &end);
-                elapsed_time[i] = 1000 * 1000 * 1000 * (end.tv_sec - start.tv_sec);
-                elapsed_time[i] += end.tv_nsec - start.tv_nsec;
-                elapsed_time[i] = elapsed_time[i] / ITER;
-                printf("elapsed_time = %lld\n", elapsed_time[i]);
-            }
- */        
+    } 
+    result = SSL_connect(ssl);
+    if (result == 1) {
+        for(int i = 1; i < 62; i++){
+            int size = i * 256;
+            printf("size = %d\n", size);
+            elapsed_time[i * 3] = post_request(ssl, size);
+            printf("%lld ns\n", elapsed_time[i * 3]);
+            elapsed_time[i * 3 + 1] = get_request(ssl);
+            printf("%lld ns\n", elapsed_time[i * 3 + 1]);
+            elapsed_time[i * 3 + 2] = delete_request(ssl);
+            printf("%lld ns\n", elapsed_time[i * 3 + 2]);                
         }
     }
+    
 
 /*     log_file(elapsed_time); */
     close(s);
