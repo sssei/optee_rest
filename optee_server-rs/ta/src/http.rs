@@ -69,7 +69,6 @@ fn parse_request<'a>(request: &'a String, http_state: &'a mut HttpParseState) ->
 pub fn handle_request(plain_buf : &mut Vec<u8>, response : &mut Vec<u8>, http_state: &mut HttpParseState) {
     let res = plain_buf.iter().map(|&s| s as char).collect::<String>();
     let request = parse_request(&res, http_state);    
-    trace_println!("Request is {:?}", request[0]);
     let uri = request[1];
     let mut res_header : Vec<u8> = b"HTTP 200 OK\r\nContent-Length: ".to_vec();
     response.append(&mut res_header);
