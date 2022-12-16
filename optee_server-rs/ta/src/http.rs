@@ -24,6 +24,10 @@ fn parse_start<'a>(request: &'a String, http_state: &'a mut HttpParseState) -> V
             *http_state = HttpParseState::Finish;
             return vec!["GET", uri];
         }
+        "DELETE" => {
+            *http_state = HttpParseState::Finish;
+            return vec!["DELETE", uri];
+        }
         _ => {
             trace_println!("Request method is bad");
             panic!();
@@ -46,7 +50,6 @@ fn parse_start<'a>(request: &'a String, http_state: &'a mut HttpParseState) -> V
                 *http_state = HttpParseState::BodyIncomplete;
                 trace_println!("body size not content-length");
                 panic!();
-                return vec!["POST", uri, r];
             }
         }
     }
@@ -67,14 +70,21 @@ pub fn handle_request(plain_buf : &mut Vec<u8>, response : &mut Vec<u8>, http_st
     let res = plain_buf.iter().map(|&s| s as char).collect::<String>();
     let request = parse_request(&res, http_state);    
     trace_println!("Request is {:?}", request[0]);
-    let mut res_header : Vec<u8> = b"HTTP 200 OK\r\n".to_vec();
+    let uri = request[1];
+    let mut res_header : Vec<u8> = b"HTTP 200 OK\r\nContent-Length: ".to_vec();
+    response.append(&mut res_header);
     match request[0] {
         "POST" => {
-            handle_post(request[2]);
-            response.append(&mut res_header);
+            let body = request[2];
+            handle_post(uri, body);
+            response.append(&mut b"0\r\n\r\n".to_vec());
         }
         "GET" => {
-            handle_get(response);
+            handle_get(uri, response)
+        }
+        "DELETE" => {
+            handle_delete(uri);
+            response.append(&mut b"0\r\n\r\n".to_vec());            
         }
         _ => {
             trace_println!("bad request");
@@ -83,11 +93,19 @@ pub fn handle_request(plain_buf : &mut Vec<u8>, response : &mut Vec<u8>, http_st
     }
 } 
 
-fn handle_post(body: &str){
+fn handle_post(uri: &str, body: &str){
     let bytes : &[u8] = body.as_bytes();
-    file::create_raw_object(bytes.to_vec()).unwrap();
+    file::create_raw_object(uri, bytes.to_vec()).unwrap();
 }
 
-fn handle_get(data: &mut Vec<u8>){
-    file::read_raw_object(data).unwrap();
+fn handle_get(uri: &str, response: &mut Vec<u8>) {
+    let mut data : Vec<u8> = Vec::new();
+    let size = file::read_raw_object(uri, &mut data).unwrap();
+    response.append(&mut size.to_string().as_bytes().to_vec());
+    response.append(&mut b"\r\n\r\n".to_vec());
+    response.append(&mut data);
+}
+
+fn handle_delete(uri: &str){
+    file::delete_object(uri).unwrap();
 }

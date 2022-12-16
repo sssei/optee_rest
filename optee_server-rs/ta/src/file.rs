@@ -1,8 +1,8 @@
 use optee_utee::{DataFlag, ObjectStorageConstants, PersistentObject};
 use optee_utee::{Error, ErrorKind, Result};
 
-pub fn create_raw_object(data: Vec<u8>) -> Result<()> {
-    let mut obj_id = vec![0, 1, 2, 3, 4];
+pub fn create_raw_object(uri: &str, data: Vec<u8>) -> Result<()> {
+    let mut obj_id = uri.as_bytes().to_vec();
 
     let obj_data_flag = DataFlag::ACCESS_READ
         | DataFlag::ACCESS_WRITE
@@ -35,8 +35,8 @@ pub fn create_raw_object(data: Vec<u8>) -> Result<()> {
     }
 }
 
-pub fn read_raw_object(data: &mut Vec<u8>) -> Result<()> {
-    let mut obj_id = vec![0, 1, 2, 3, 4];
+pub fn read_raw_object(uri: &str, data: &mut Vec<u8>) -> Result<u32> {
+    let mut obj_id = uri.as_bytes().to_vec();
 
     match PersistentObject::open(
         ObjectStorageConstants::Private,
@@ -55,7 +55,27 @@ pub fn read_raw_object(data: &mut Vec<u8>) -> Result<()> {
                 return Err(Error::new(ErrorKind::ExcessData));
             }
 
-            Ok(())
+            Ok(read_bytes)
+        }
+    }
+}
+
+pub fn delete_object(uri: &str) -> Result<()> {
+    let mut obj_id = uri.as_bytes().to_vec();
+
+    match PersistentObject::open(
+        ObjectStorageConstants::Private,
+        &mut obj_id,
+        DataFlag::ACCESS_READ | DataFlag::ACCESS_WRITE_META,
+    ) {
+        Err(e) => {
+            return Err(e);
+        }
+
+        Ok(mut object) => {
+            object.close_and_delete()?;
+            std::mem::forget(object);
+            return Ok(());
         }
     }
 }
