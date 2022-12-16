@@ -13,14 +13,16 @@ static void log_file(long long* elapsed_time){
     char file[50];
     time_t t = time(NULL);
     struct tm *local = localtime(&t);
-    sprintf(file, "%04d-%02d-%02d_%02d-%02d", local->tm_year + 1900,
+    sprintf(file, "%04d-%02d-%02d_%02d-%02d_http", local->tm_year + 1900,
         local->tm_mon + 1, local->tm_mday, local->tm_hour, local->tm_min);
     
     printf("%s\n", file);
     fp = fopen(file, "w");
-    for(int i = 1; i <= 62; i++){
+    for(int i = 1; i < 62; i++){
         fprintf(fp, "size = %d\n", 256 * i);
-        fprintf(fp, "%lld ns\n", elapsed_time[i]);
+        fprintf(fp, "%lld ns\n", elapsed_time[i * 3]);
+        fprintf(fp, "%lld ns\n", elapsed_time[i * 3 + 1]);
+        fprintf(fp, "%lld ns\n", elapsed_time[i * 3 + 2]);                
     }
     fclose(fp);
 }
@@ -107,7 +109,7 @@ int main (int argc, char *argv[])
     struct sockaddr_in srv_addr;
     SSL_CTX *ctx;
     SSL *ssl;
-    long long elapsed_time[3 * 256 * 62];
+    long long elapsed_time[3 * 63];
 
     ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_use_certificate_file(ctx, "cacert.pem", SSL_FILETYPE_PEM);
@@ -130,17 +132,24 @@ int main (int argc, char *argv[])
         for(int i = 1; i < 62; i++){
             int size = i * 256;
             printf("size = %d\n", size);
-            elapsed_time[i * 3] = post_request(ssl, size);
+            elapsed_time[i * 3] = 0;
+            elapsed_time[i * 3 + 1] = 0;            
+            elapsed_time[i * 3 + 2] = 0;                        
+            for(int j = 0; j < 100; j++){
+                elapsed_time[i * 3] += post_request(ssl, size);
+                elapsed_time[i * 3 + 1] += get_request(ssl);
+                elapsed_time[i * 3 + 2] += delete_request(ssl);
+            }
+            elapsed_time[i * 3] = elapsed_time[i * 3] / 100;
+            elapsed_time[i * 3 + 1] = elapsed_time[i * 3 + 1] / 100;            
+            elapsed_time[i * 3 + 2] = elapsed_time[i * 3 + 2] / 100;  
             printf("%lld ns\n", elapsed_time[i * 3]);
-            elapsed_time[i * 3 + 1] = get_request(ssl);
             printf("%lld ns\n", elapsed_time[i * 3 + 1]);
-            elapsed_time[i * 3 + 2] = delete_request(ssl);
-            printf("%lld ns\n", elapsed_time[i * 3 + 2]);                
+            printf("%lld ns\n", elapsed_time[i * 3 + 2]);                        
         }
     }
-    
 
-/*     log_file(elapsed_time); */
+    log_file(elapsed_time);
     close(s);
     SSL_free(ssl);
     SSL_CTX_free(ctx);
