@@ -46,9 +46,9 @@ fn measure(ta_session: &mut Session, size: u32) {
     }
 
     println!("size = {:?}", size);
-    println!("{:?}", (time_create - time_nothing) / iter );
-    println!("{:?}", (time_read - time_nothing) / iter);
-    println!("{:?}", (time_delete - time_nothing) / iter);
+    println!("{:?}", ((time_create - time_nothing) / iter).as_nanos() );
+    println!("{:?}", ((time_read - time_nothing) / iter).as_nanos());
+    println!("{:?}", ((time_delete - time_nothing) / iter).as_nanos());
 }
 
 fn main() -> optee_teec::Result<()> {
