@@ -32,9 +32,9 @@ fn measure(size: u32) {
     }
 
     println!("size = {:?}", size);
-    println!("{:?}", time_create / iter );
-    println!("{:?}", time_read / iter);
-    println!("{:?}", time_delete / iter);
+    println!("{:?}", (time_create / iter).as_nanos() );
+    println!("{:?}", (time_read / iter).as_nanos());
+    println!("{:?}", (time_delete / iter).as_nanos());
 }
 
 fn create_file(file_size: u32){
