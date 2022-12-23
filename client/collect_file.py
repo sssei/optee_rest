@@ -1,6 +1,6 @@
 import re 
 
-tee_file = "2022-12-21_23-17_file_TEE"
+tee_file = "file_tee/2022-12-21_23-17_file_TEE"
 
 data_list = []
 
@@ -37,6 +37,9 @@ for i in range(0, 61):
         post += post_list[j][i]
         get += get_list[j][i]
         delete += delete_list[j][i]
+    post /= 10
+    get /= 10
+    delete /= 10        
     f.write(str(size) + "\n")
     f.write(str(post) + "\n") 
     f.write(str(get) + "\n") 
