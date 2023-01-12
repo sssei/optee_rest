@@ -115,8 +115,9 @@ int main (int argc, char *argv[])
     SSL_CTX_use_certificate_file(ctx, "cacert.pem", SSL_FILETYPE_PEM);
  
     srv_addr.sin_family = AF_INET;
-    srv_addr.sin_port = htons(8089);
-    inet_pton(AF_INET, "192.168.12.24", &srv_addr.sin_addr);
+    srv_addr.sin_port = htons(8090);
+//    inet_pton(AF_INET, "192.168.12.24", &srv_addr.sin_addr);
+    inet_pton(AF_INET, "127.0.0.1", &srv_addr.sin_addr);
 
     s = socket(AF_INET, SOCK_STREAM, 0);
     ssl = SSL_new(ctx);
