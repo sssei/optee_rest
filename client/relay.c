@@ -44,7 +44,7 @@ void *readToWrite(int file[]){
         }
         pthread_mutex_lock( &mutex );
         // 標準出力ストリームへ書き出し
-        write(1,buffer,(unsigned int) read_size);
+        // write(1,buffer,(unsigned int) read_size);
         pthread_mutex_unlock( &mutex );
         // 出力側ストリームへ書き出し
         write(out_file,buffer,(unsigned int) read_size);
