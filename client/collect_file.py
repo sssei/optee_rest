@@ -1,6 +1,6 @@
 import re 
 
-tee_file = "file_tee/2022-12-21_23-17_file_TEE"
+tee_file = "file_tee2/2023-02-09_14-39_file_TEE"
 
 data_list = []
 
@@ -26,7 +26,7 @@ for data in data_list:
     get_list.append(get_time)
     delete_list.append(delete_time)
 
-f = open("collected_file_TEE", 'w')
+f = open("collected_file_TEE2", 'w')
 
 for i in range(0, 61):
     size = 256 * (i + 1)
