@@ -3,8 +3,8 @@ import re
 import datetime 
 import matplotlib.pyplot as plt 
 
-tee_file = "../client/collected_file_TEE"
-normal_file = "../client/2022-12-22_23_07_file_REE"
+tee_file = "../client/collected_file_TEE2"
+normal_file = "../client/2023-02-09_14-37_file_REE"
 title = "File I/O Time"
 
 f1 = open(tee_file, 'r')

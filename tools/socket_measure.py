@@ -3,10 +3,10 @@ import re
 import datetime 
 import matplotlib.pyplot as plt 
 
-tee_socket_file = "../client/2022-12-16_15-40_socket_TEE"
-normal_socket_file = "../client/2022-12-16_15-49_socket_REE"
-tee_tls_file = "../client/2022-12-13_18-00_tls_TEE"
-normal_tls_file = "../client/2022-12-13_18-01_tls_REE"
+tee_socket_file = "../client/2023-02-09_12-25_socket_TEE"
+normal_socket_file = "../client/2023-02-09_12-25_socket_REE"
+tee_tls_file = "../client/2023-02-09_13-54_tls_TEE"
+normal_tls_file = "../client/2023-02-09_13-50_tls_REE"
 title = "RTT"
 
 f1 = open(tee_socket_file, 'r')

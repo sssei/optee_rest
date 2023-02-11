@@ -3,8 +3,8 @@ import re
 import datetime 
 import matplotlib.pyplot as plt 
 
-tee_file = "../client/2022-12-16_14-15_http_TEE"
-normal_file = "../client/2022-12-16_14-46_http_REE"
+tee_file = "../client/2023-02-09_12-13_http_TEE"
+normal_file = "../client/2023-02-09_12-14_http_REE"
 title = "REST API RTT"
 
 f1 = open(tee_file, 'r')

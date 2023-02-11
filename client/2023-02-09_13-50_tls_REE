@@ -1,0 +1,122 @@
+size = 256
+657110 ns
+size = 512
+661291 ns
+size = 768
+633032 ns
+size = 1024
+744651 ns
+size = 1280
+725190 ns
+size = 1536
+576810 ns
+size = 1792
+724854 ns
+size = 2048
+818345 ns
+size = 2304
+660038 ns
+size = 2560
+736715 ns
+size = 2816
+741909 ns
+size = 3072
+660582 ns
+size = 3328
+659680 ns
+size = 3584
+722502 ns
+size = 3840
+628508 ns
+size = 4096
+648099 ns
+size = 4352
+693827 ns
+size = 4608
+624044 ns
+size = 4864
+651288 ns
+size = 5120
+661456 ns
+size = 5376
+647956 ns
+size = 5632
+680721 ns
+size = 5888
+621833 ns
+size = 6144
+663427 ns
+size = 6400
+712609 ns
+size = 6656
+729133 ns
+size = 6912
+721398 ns
+size = 7168
+667733 ns
+size = 7424
+738473 ns
+size = 7680
+898813 ns
+size = 7936
+986587 ns
+size = 8192
+906608 ns
+size = 8448
+868255 ns
+size = 8704
+853844 ns
+size = 8960
+1348785 ns
+size = 9216
+1080665 ns
+size = 9472
+727103 ns
+size = 9728
+829456 ns
+size = 9984
+704888 ns
+size = 10240
+758279 ns
+size = 10496
+729344 ns
+size = 10752
+909512 ns
+size = 11008
+797543 ns
+size = 11264
+756807 ns
+size = 11520
+765527 ns
+size = 11776
+965824 ns
+size = 12032
+940765 ns
+size = 12288
+989449 ns
+size = 12544
+960450 ns
+size = 12800
+968326 ns
+size = 13056
+998533 ns
+size = 13312
+975327 ns
+size = 13568
+996966 ns
+size = 13824
+1004193 ns
+size = 14080
+997913 ns
+size = 14336
+902914 ns
+size = 14592
+826746 ns
+size = 14848
+828162 ns
+size = 15104
+843292 ns
+size = 15360
+822605 ns
+size = 15616
+840433 ns
