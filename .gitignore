@@ -3,3 +3,6 @@ optee_server-rs/*/target
 */target
 out
 !tools/measure_time.py
+!tools/http_measure.py
+!tools/socket_measure.py
+!tools/file_measure.py
