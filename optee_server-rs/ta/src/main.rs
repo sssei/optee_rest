@@ -75,33 +75,37 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
 }
 
 pub fn deploy_server() {
+
     let mut stream = TcpStream::listen("0.0.0.0", 8089).unwrap();
     trace_println!("[+] deploy_server");
-    stream.accept().unwrap();
 
-    let mut tls_session = tls::new_tls_session();
-    let mut http_state = HttpParseState::Start;
     loop {
-        let mut plain_buf : Vec<u8> = Vec::new();
-        let mut response : Vec<u8> = Vec::new();
-        let mut buf = [0u8; MAX_WIRE_SIZE];
-        match stream.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                tls::do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
-                if !plain_buf.is_empty() {
-                    http::handle_request(&mut plain_buf, &mut response, &mut http_state);
+        let mut cur_stream = stream.accept().unwrap();
+
+        let mut tls_session = tls::new_tls_session();
+        let mut http_state = HttpParseState::Start;
+        loop {
+            let mut plain_buf : Vec<u8> = Vec::new();
+            let mut response : Vec<u8> = Vec::new();
+            let mut buf = [0u8; MAX_WIRE_SIZE];
+            match cur_stream.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    tls::do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
+                    if !plain_buf.is_empty() {
+                        http::handle_request(&mut plain_buf, &mut response, &mut http_state);
+                    }
+                }
+                Err(_) => {
+                    trace_println!("Read Error");
+                    break;
                 }
             }
-            Err(_) => {
-                trace_println!("Read Error");
-                break;
+            if http_state == HttpParseState::Finish{
+                http_state = HttpParseState::Start;
+                let n = tls::do_tls_write(&mut tls_session, &mut buf, &response);
+                cur_stream.write_all(&buf[..n]).unwrap();
             }
-        }
-        let n = tls::do_tls_write(&mut tls_session, &mut buf, &response);
-        stream.write_all(&buf[..n]).unwrap();
-        if http_state == HttpParseState::Finish {
-            http_state = HttpParseState::Start;
         }
     }
 }

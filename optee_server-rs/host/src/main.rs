@@ -25,7 +25,9 @@ fn main() -> optee_teec::Result<()> {
     let uuid = Uuid::parse_str(UUID).unwrap();
     let mut ta_session = ctx.open_session(uuid)?;
     let mut session_id: u32 = 0;
-    deploy_server(&mut ta_session, session_id);
+    loop {
+        deploy_server(&mut ta_session, session_id);
+    }
     println!("Success");
     Ok(())
 }

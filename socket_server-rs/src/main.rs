@@ -18,12 +18,10 @@ fn main() {
 fn handle_client(
     mut stream: TcpStream,
 ) {
-    println!("new session");
     loop {
         let mut buf = [0u8; MAX_WIRE_SIZE];
         match stream.read(&mut buf) {
             Ok(0) | Err(_) => {
-                println!("close session");
                 break;
             }
             Ok(n) => {

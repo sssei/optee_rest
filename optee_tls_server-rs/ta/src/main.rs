@@ -73,27 +73,31 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
 
 pub fn deploy_server() {
     let mut stream = TcpStream::listen("0.0.0.0", 8089).unwrap();
-    trace_println!("[+] deploy_server");
-    stream.accept().unwrap();
+    trace_println!("[+] deploy_server2");
 
-    let mut tls_session = new_tls_session();
-    loop {
-        let mut plain_buf : Vec<u8> = Vec::new();
-        let mut buf = [0u8; MAX_WIRE_SIZE];
-        match stream.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
+    loop{
+        trace_println!("before accept");
+        let mut cur_stream = stream.accept().unwrap();
+        trace_println!("after accept");
+        let mut tls_session = new_tls_session();
+        loop {
+            let mut plain_buf : Vec<u8> = Vec::new();
+            let mut buf = [0u8; MAX_WIRE_SIZE];
+            match cur_stream.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    trace_println!("debug");
+                    do_tls_read(&mut tls_session, &buf[..n], &mut plain_buf);
+                }
+                Err(_) => {
+                    trace_println!("Read Error");
+                    break;
+                }
             }
-            Err(_) => {
-                trace_println!("Read Error");
-                break;
-            }
+            let n = do_tls_write(&mut tls_session, &mut buf, &plain_buf);
+            cur_stream.write_all(&buf[..n]).unwrap();
         }
-        let n = do_tls_write(&mut tls_session, &mut buf, &plain_buf);
-        stream.write_all(&buf[..n]).unwrap();
     }
-    
 }
 
 

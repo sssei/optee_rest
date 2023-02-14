@@ -33,7 +33,7 @@ fn main() {
 fn handle_client(
     mut stream: TcpStream,
 ) {
-    println!("new session");
+
     let mut tls_session = new_tls_session();
     loop {
         let mut buf = [0u8; MAX_WIRE_SIZE];
@@ -41,7 +41,6 @@ fn handle_client(
 /*         println!("stream read"); */
         match stream.read(&mut buf) {
             Ok(0) | Err(_) => {
-                println!("close session");
                 break;
             }
             Ok(n) => {

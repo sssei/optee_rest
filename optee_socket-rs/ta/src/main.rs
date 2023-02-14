@@ -70,20 +70,21 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
 pub fn deploy_server() {
     let mut stream = TcpStream::listen("0.0.0.0", 8089).unwrap();
     trace_println!("[+] deploy_server");
-    stream.accept().unwrap();
-
-    loop {
-        let mut buf = [0u8; MAX_WIRE_SIZE];
-        match stream.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => stream.write_all(&buf[..n]).unwrap(),
-            Err(_) => {
-                trace_println!("Read Error");
-                break;
+    
+    loop{
+        let mut cur_stream = stream.accept().unwrap();
+        loop {
+            let mut buf = [0u8; MAX_WIRE_SIZE];
+            match cur_stream.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => cur_stream.write_all(&buf[..n]).unwrap(),
+                Err(_) => {
+                    trace_println!("Read Error");
+                    break;
+                }
             }
         }
-    }
-    
+    }    
 }
 
 // TA configurations

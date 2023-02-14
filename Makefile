@@ -17,8 +17,10 @@ server-rs:
 	make -C server-rs	
 
 install:
-	install -D optee_tls_server-rs/host/target/aarch64-unknown-linux-gnu/release/optee_tls_server-rs -t out/host/ || :
-	install -D optee_tls_server-rs/ta/target/aarch64-unknown-optee-trustzone/release/*.ta -t out/ta/  || :
+	install -D optee_tls_server-rs/host/target/aarch64-unknown-linux-gnu/release/optee_tls_server-rs -t out/host/ 
+	install -D optee_tls_server-rs/ta/target/aarch64-unknown-optee-trustzone/release/*.ta -t out/ta/  
+	install -D optee_tls_server-rs2/host/target/aarch64-unknown-linux-gnu/release/optee_tls_server-rs2 -t out/host/ 
+	install -D optee_tls_server-rs2/ta/target/aarch64-unknown-optee-trustzone/release/*.ta -t out/ta/  
 	install -D optee_socket-rs/host/target/aarch64-unknown-linux-gnu/release/optee_socket-rs -t out/host/ || :
 	install -D optee_socket-rs/ta/target/aarch64-unknown-optee-trustzone/release/*.ta -t out/ta/  || :
 	install -D optee_server-rs/host/target/aarch64-unknown-linux-gnu/release/optee_server-rs -t out/host/
